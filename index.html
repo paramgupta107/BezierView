@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Bezier View</title>
+    </head>
+    <body>
+        <div id="container"></div>
+        <style>
+            body {
+                margin: 0;
+                overflow: hidden;
+            }
+        </style>
+        <script type="importmap">
+            {
+                "imports": {
+                  "three": "https://cdn.jsdelivr.net/npm/three@0.167.1/build/three.module.js",
+                  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.167.1/examples/jsm/"
+                }
+              }
+        </script>
+        <!-- <script type="module" src = "stateManager.js"></script> -->
+        <script type="module">
+            import * as THREE from 'three';
+            import {globalState, setupGui} from './stateManager.js';
+            import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+            let camera, scene, renderer, light, controls, time = 0;
+            const clock = new THREE.Clock();
+            function init(){
+                // GUI
+
+                setupGui();
+
+                // CAMERA
+
+                camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 10000 );
+                camera.position.set( - 5, 5, 5 );
+
+                // SCENE
+
+                scene = new THREE.Scene();
+                scene.background = new THREE.Color( 0xffffff );
+
+                const gridHelper = new THREE.PolarGridHelper( 2, 16 );
+	            scene.add( gridHelper );
+
+                // LIGHTS
+
+                light = new THREE.DirectionalLight( 0xffffff, 5 );
+                light.position.set( 0.5, 1, 0.5 );
+                scene.add( light );
+
+                // RENDERER
+
+                renderer = new THREE.WebGLRenderer();
+                renderer.setPixelRatio( window.devicePixelRatio );
+                renderer.setSize( window.innerWidth, window.innerHeight );
+                renderer.setAnimationLoop( animate );
+                container.appendChild( renderer.domElement );
+
+                // CONTROLS
+
+			    controls = new OrbitControls( camera, renderer.domElement );
+
+                // EVENTS
+
+			    window.addEventListener( 'resize', onWindowResize );
+            }
+
+            function onWindowResize() {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize( window.innerWidth, window.innerHeight );
+            }
+
+            function animate() {
+                render();
+            }
+
+            function render() {
+
+                const delta = clock.getDelta();
+                time += delta;
+                // render
+                renderer.render( scene, camera );
+                }
+
+            init();
+        </script>
+    </body>
+</html>
