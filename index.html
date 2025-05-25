@@ -7,6 +7,7 @@
     </head>
     <body>
         <div id="container"></div>
+        <input id="fileInput" type="file" style="visibility:hidden;position: absolute;" />
         <style>
             body {
                 margin: 0;
@@ -25,12 +26,14 @@
         <!-- <script type="module" src = "stateManager.js"></script> -->
         <script type="module">
             import * as THREE from 'three';
-            import {globalState, setupGui} from './stateManager.js';
+            import {globalState, setupGui, loadFile} from './stateManager.js';
             import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
             let camera, scene, renderer, light, controls, time = 0;
             const clock = new THREE.Clock();
             function init(){
+                // File loader
+                document.getElementById('fileInput').addEventListener('change', (event) => {loadFile(event.target.files[0])});
                 // GUI
 
                 setupGui();

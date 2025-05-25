@@ -68,7 +68,7 @@ function setupGui()
     const loadFileFolder = gui.addFolder('Load File').close();
     let fileOptions = ['Logo', 'Teapot', 'Hexoid', 'Cube, G2', 'Male Head'];
     loadFileFolder.add(globalState, 'file', fileOptions,).name('Choose Model');
-    loadFileFolder.add( {func() {loadFile();}}, 'func' ).name('Load File');
+    loadFileFolder.add( {func() {const fileElem = document.getElementById('fileInput');fileElem.click()}}, 'func' ).name('Load File');
 
 
     // 'Shader Settings' Section
@@ -219,7 +219,19 @@ function addGroup() {
 
 function loadFile(file) {
     // Load the file, parse the file, update the global state, update the GUI
-    alert("hello");
+    if(file){
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const fileContent = event.target.result;
+            // Parse the file content here
+            // Update globalState with the parsed data
+            // Call updateGui() to refresh the GUI with new data
+            // Only override state if the entire file is successfully parsed
+            alert(fileContent);
+        }
+        reader.readAsText(file);
+        
+    }
 }
 
-export { setupGui, globalState };
+export { setupGui, globalState, loadFile };
