@@ -1,74 +1,66 @@
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 
 const gui = new GUI();
-
-const guiState = {
-	myBoolean: true,
-	myString: 'lil-gui',
-	myNumber: 1
-};
+const controllers = [];
 
 const globalState = {
+
+    // common/global settings
+    activeGroup: "All Groups",
+
+    // File
     file: 'Logo',
 
-    // Shader Settings
-    flipNormals: false,
-    flatShading: false,
-    // can only have one of the following three active at a time
-    highlightLines: false,
-    highlightReflection: false,
-    wireframe: false,
-    visualizeNormals: false,
-    highlightDensity: 0.50,
-    highlightResolution: 10.0,
-    visualizeNormalSize: 1.0,
-
-    // Curvature
-    showCurvature: false,
-    curvatureType: "Gaussian",
-    // the following two shouldn't be editable, just display numbers
-    curvatureMin: 0,
-    curvatureMax: 0,
-    clampMin: 0,
-    clampMax: 0,
+    // Other
+    mouseMode: "Rotate",
+    position: "Position 1",
 
     // Display
-    controlMesh: false,
-    boundingBox: false,
-    showPatches: true,
     light1: true,
     light2: false,
     light3: false,
     patchDetail: '4 x 4',
 
-    // Groups
-    group: "All Groups",
-    groupColor: "Yellow",
+    // Help
+    helpDummy: 0,
 
-    // Other
-    mouseMode: "Rotate",
-    position: "Position 1",
+    // group-specific settings
+    groupSettings: {
+        "All Groups": {
+            // Shader Settings
+            flipNormals: false,
+            flatShading: false,
+            // can only have one of the following three active at a time
+            highlightLines: false,
+            highlightReflection: false,
+            wireframe: false,
+            visualizeNormals: false,
+            highlightDensity: 0.50,
+            highlightResolution: 10.0,
+            visualizeNormalSize: 1.0,
+
+            // Curvature
+            showCurvature: false,
+            curvatureType: "Gaussian",
+            // the following two shouldn't be editable, just display numbers
+            curvatureMin: 0,
+            curvatureMax: 0,
+            clampMin: 0,
+            clampMax: 0,
+
+            // Display
+            controlMesh: false,
+            boundingBox: false,
+            showPatches: true,
+
+            // Groups
+            groupColor: "Yellow",
+        }
+    },
 }
 
 function setupGui()
 {
-    /*
-    // Create a folder for the GUI
-    const folder = gui.addFolder('My Folder');
-
-    // Add a boolean controller
-    folder.add(guiState, 'myBoolean').name('My Boolean');
-
-    // Add a string controller
-    folder.add(guiState, 'myString').name('My String');
-
-    // Add a number controller
-    folder.add(guiState, 'myNumber', 0, 10).name('My Number');
-
-    // Open the folder
-    folder.open();
-    */
-
     // 'Load File' Section
     const loadFileFolder = gui.addFolder('Load File').close();
     let fileOptions = ['Logo', 'Teapot', 'Hexoid', 'Cube, G2', 'Male Head'];
@@ -76,40 +68,84 @@ function setupGui()
     loadFileFolder.add( {func() {loadFile();}}, 'func' ).name('Load File');
 
 
+    // sweet ass macro
+    // change 'globalState' to 'globalState.groupSettings["All Groups"]'
+    // yank first value in quotes (name of json property)
+    // append .onChange(propogateState('nameofjsonprop'))
+    // prepend const nameofjsonprop =
+    // newline: controllers.push(name)
+    // it was in fact a sweet ass macro
+
     // 'Shader Settings' Section
     const shaderSettingsFolder = gui.addFolder('Shader Settings').close();
-    shaderSettingsFolder.add(globalState, 'flipNormals').name('Flip Normals');
-    shaderSettingsFolder.add(globalState, 'flatShading').name('Flat Shading');
-    shaderSettingsFolder.add(globalState, 'highlightLines').name('Highlight Lines');
-    shaderSettingsFolder.add(globalState, 'highlightReflection').name('Highlight Reflection');
-    shaderSettingsFolder.add(globalState, 'wireframe').name('Wireframe');
-    shaderSettingsFolder.add(globalState, 'visualizeNormals').name('Visualize Normals');
+    const flipNormals = shaderSettingsFolder.add(globalState.groupSettings["All Groups"], 'flipNormals').name('Flip Normals').onChange(propogateState('flipNormals'));
+    controllers.push(flipNormals);
 
-    shaderSettingsFolder.add(globalState, 'highlightDensity', 0, 1, 0.05).name('Highlight Density');
-    shaderSettingsFolder.add(globalState, 'highlightResolution', 0, 30, 0.1).name('Highlight Resolution');
-    shaderSettingsFolder.add(globalState, 'visualizeNormalSize', 0.01, 10, 0.01).name('Visualize Normals Size');
+    const flatShading = shaderSettingsFolder.add(globalState.groupSettings["All Groups"], 'flatShading').name('Flat Shading').onChange(propogateState('flatShading'));
+    controllers.push(flatShading);
+
+    const highlightLines = shaderSettingsFolder.add(globalState.groupSettings["All Groups"], 'highlightLines').name('Highlight Lines').onChange(propogateState('highlightLines'));
+    controllers.push(highlightLines);
+
+    const highlightReflection = shaderSettingsFolder.add(globalState.groupSettings["All Groups"], 'highlightReflection').name('Highlight Reflection').onChange(propogateState('highlightReflection'));
+    controllers.push(highlightReflection);
+
+    const wireframe = shaderSettingsFolder.add(globalState.groupSettings["All Groups"], 'wireframe').name('Wireframe').onChange(propogateState('wireframe'));
+    controllers.push(wireframe);
+
+    const visualizeNormals = shaderSettingsFolder.add(globalState.groupSettings["All Groups"], 'visualizeNormals').name('Visualize Normals').onChange(propogateState('visualizeNormals'));
+    controllers.push(visualizeNormals);
+
+
+    const highlightDensity = shaderSettingsFolder.add(globalState.groupSettings["All Groups"], 'highlightDensity', 0, 1, 0.05).name('Highlight Density').onChange(propogateState('highlightDensity'));
+    controllers.push(highlightDensity);
+
+    const highlightResolution = shaderSettingsFolder.add(globalState.groupSettings["All Groups"], 'highlightResolution', 0, 30, 0.1).name('Highlight Resolution').onChange(propogateState('highlightResolution'));
+    controllers.push(highlightResolution);
+
+    const visualizeNormalSize = shaderSettingsFolder.add(globalState.groupSettings["All Groups"], 'visualizeNormalSize', 0.01, 10, 0.01).name('Visualize Normals Size').onChange(propogateState('visualizeNormalSize'));
+    controllers.push(visualizeNormalSize);
+
 
 
     // 'Curvature' Section
     const curvatureFolder = gui.addFolder('Curvature').close();
-    curvatureFolder.add(globalState, 'showCurvature').name('Show Curvature');
+    const showCurvature = curvatureFolder.add(globalState.groupSettings["All Groups"], 'showCurvature').name('Show Curvature').onChange(propogateState('showCurvature'));
+    controllers.push(showCurvature);
+
 
     let curvatureOptions = ['Gaussian', 'Mean', 'Max', 'Min'];
-    curvatureFolder.add(globalState, 'curvatureType', curvatureOptions).name('Curvature Types');
+    const curvatureType = curvatureFolder.add(globalState.groupSettings["All Groups"], 'curvatureType', curvatureOptions).name('Curvature Types').onChange(propogateState('curvatureType'));
+    controllers.push(curvatureType);
+
 
     // next two disabled since they're information readouts, and thus not editable
-    curvatureFolder.add(globalState, 'curvatureMin').name('Curvature Min').disable();
-    curvatureFolder.add(globalState, 'curvatureMax').name('Curvature Max').disable();
-    curvatureFolder.add(globalState, 'clampMin').name('Clamp Min');
-    curvatureFolder.add(globalState, 'clampMax').name('Clamp Max');
+    const curvatureMin = curvatureFolder.add(globalState.groupSettings["All Groups"], 'curvatureMin').name('Curvature Min').disable().onChange(propogateState('curvatureMin'));
+    controllers.push(curvatureMin);
+
+    const curvatureMax = curvatureFolder.add(globalState.groupSettings["All Groups"], 'curvatureMax').name('Curvature Max').disable().onChange(propogateState('curvatureMax'));
+    controllers.push(curvatureMax);
+
+    const clampMin = curvatureFolder.add(globalState.groupSettings["All Groups"], 'clampMin').name('Clamp Min').onChange(propogateState('clampMin'));
+    controllers.push(clampMin);
+
+    const clampMax = curvatureFolder.add(globalState.groupSettings["All Groups"], 'clampMax').name('Clamp Max').onChange(propogateState('clampMax'));
+    controllers.push(clampMax);
+
     curvatureFolder.add({func() {}}, 'func').name('Reset Clamp');
 
 
     // 'Display' Section
     const displayFolder = gui.addFolder('Display').close();
-    displayFolder.add(globalState, 'controlMesh').name('Show Control Mesh');
-    displayFolder.add(globalState, 'boundingBox').name('Show Bounding Box');
-    displayFolder.add(globalState, 'showPatches').name('Show Patches');
+    const controlMesh = displayFolder.add(globalState.groupSettings["All Groups"], 'controlMesh').name('Show Control Mesh').onChange(propogateState('controlMesh'));
+    controllers.push(controlMesh);
+
+    const boundingBox = displayFolder.add(globalState.groupSettings["All Groups"], 'boundingBox').name('Show Bounding Box').onChange(propogateState('boundingBox'));
+    controllers.push(boundingBox);
+
+    const showPatches = displayFolder.add(globalState.groupSettings["All Groups"], 'showPatches').name('Show Patches').onChange(propogateState('showPatches'));
+    controllers.push(showPatches);
+
 
     displayFolder.add(globalState, 'light1').name('Light 1');
     displayFolder.add(globalState, 'light2').name('Light 2');
@@ -122,12 +158,16 @@ function setupGui()
     // 'Groups' Section
     const groupsFolder = gui.addFolder('Groups').close();
 
-    let groupOptions = ['All Groups', '(unnamed group)'];
-    groupsFolder.add(globalState, 'group', groupOptions).name('Group');
+    //let groupOptions = ['All Groups', '(unnamed group)'];
+    //groupsFolder.add(globalState, 'activeGroup', groupOptions).name('Group');
+    groupsFolder.add(globalState, 'activeGroup', Object.keys(globalState.groupSettings)).onChange(changeGroup).name('Group');
 
     let groupColorOptions = ['Yellow', 'Green', 'Silver', 'Red', 'Cyan', 'Magenta', 'Orange', 'Purple', 'Blue'];
-    groupsFolder.add(globalState, 'groupColor', groupColorOptions).name('Group Color');
-    groupsFolder.add({func() {}}, 'func').name('Delete Folder');
+    const groupColor = groupsFolder.add(globalState.groupSettings["All Groups"], 'groupColor', groupColorOptions).name('Group Color').onChange(propogateState('groupColor'));
+    controllers.push(groupColor);
+
+    groupsFolder.add({func() {addGroup()}}, 'func').name('Add Group');
+    groupsFolder.add({func() {}}, 'func').name('Delete Group');
 
 
     // 'Other' Section
@@ -145,10 +185,44 @@ function setupGui()
 
     // 'Help' Section
     const helpFolder = gui.addFolder('Help').close();
-    // not really a good way to display help text within the lilgui panel,
-    // maybe have a 'help' button that, when clicked, unhides a div with
-    // the information in the current help section?
-    helpFolder.add({func() {}}, 'func').name('Show Help');
+    const helpText =
+            "<b>Controls</b>\n" +
+            "Left Mouse: Rotate or Clip\n" +
+            "Right Mouse: Pan\n" +
+            "Scroll Wheel: Zoom\n" +
+            "Scroll Wheel + Alt: Scale\n" +
+            "Q and E: Z-axis rotation\n" +
+            "ESC: Reset Projection\n";
+    helpFolder.add(globalState, 'helpDummy').name(helpText).$widget.remove();
+}
+
+
+function changeGroup(groupName) {
+    for (const controller of controllers) {
+        controller.object = globalState.groupSettings[groupName]
+        controller.updateDisplay()
+    }
+}
+
+function propogateState(settingsKey){
+    function callback(value) {
+        if (globalState.activeGroup == "All Groups") {
+            for(const groupName in globalState.groupSettings) {
+                if (groupName !== "All Groups") {
+                    globalState.groupSettings[groupName][settingsKey] = value;
+                }
+            }
+        }
+    }
+    return callback;
+}
+
+// add a group to 'groupSettings', copying the settings currently in 'All Groups'
+function addGroup() {
+    const count = Object.keys(globalState.groupSettings).length;
+    console.log(`number of groups: ${count}`);
+    globalState.groupSettings[`Group ${count}`] = structuredClone(globalState.groupSettings["All Groups"]);
+    changeGroup(`Group ${count}`);
 }
 
 function loadFile(file) {
