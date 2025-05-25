@@ -1,7 +1,10 @@
-import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
+//import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
+import { GUI } from 'lil-gui';
 
 const gui = new GUI();
 const controllers = [];
+
+let groupHandle;
 
 const globalState = {
 
@@ -68,42 +71,28 @@ function setupGui()
     loadFileFolder.add( {func() {loadFile();}}, 'func' ).name('Load File');
 
 
-    // sweet ass macro
-    // change 'globalState' to 'globalState.groupSettings["All Groups"]'
-    // yank first value in quotes (name of json property)
-    // append .onChange(propogateState('nameofjsonprop'))
-    // prepend const nameofjsonprop =
-    // newline: controllers.push(name)
-    // it was in fact a sweet ass macro
-
     // 'Shader Settings' Section
     const shaderSettingsFolder = gui.addFolder('Shader Settings').close();
     const flipNormals = shaderSettingsFolder.add(globalState.groupSettings["All Groups"], 'flipNormals').name('Flip Normals').onChange(propogateState('flipNormals'));
-    controllers.push(flipNormals);
-
     const flatShading = shaderSettingsFolder.add(globalState.groupSettings["All Groups"], 'flatShading').name('Flat Shading').onChange(propogateState('flatShading'));
-    controllers.push(flatShading);
-
     const highlightLines = shaderSettingsFolder.add(globalState.groupSettings["All Groups"], 'highlightLines').name('Highlight Lines').onChange(propogateState('highlightLines'));
-    controllers.push(highlightLines);
-
     const highlightReflection = shaderSettingsFolder.add(globalState.groupSettings["All Groups"], 'highlightReflection').name('Highlight Reflection').onChange(propogateState('highlightReflection'));
-    controllers.push(highlightReflection);
-
     const wireframe = shaderSettingsFolder.add(globalState.groupSettings["All Groups"], 'wireframe').name('Wireframe').onChange(propogateState('wireframe'));
-    controllers.push(wireframe);
-
     const visualizeNormals = shaderSettingsFolder.add(globalState.groupSettings["All Groups"], 'visualizeNormals').name('Visualize Normals').onChange(propogateState('visualizeNormals'));
-    controllers.push(visualizeNormals);
 
 
     const highlightDensity = shaderSettingsFolder.add(globalState.groupSettings["All Groups"], 'highlightDensity', 0, 1, 0.05).name('Highlight Density').onChange(propogateState('highlightDensity'));
-    controllers.push(highlightDensity);
-
     const highlightResolution = shaderSettingsFolder.add(globalState.groupSettings["All Groups"], 'highlightResolution', 0, 30, 0.1).name('Highlight Resolution').onChange(propogateState('highlightResolution'));
-    controllers.push(highlightResolution);
-
     const visualizeNormalSize = shaderSettingsFolder.add(globalState.groupSettings["All Groups"], 'visualizeNormalSize', 0.01, 10, 0.01).name('Visualize Normals Size').onChange(propogateState('visualizeNormalSize'));
+
+    controllers.push(flipNormals);
+    controllers.push(flatShading);
+    controllers.push(highlightLines);
+    controllers.push(highlightReflection);
+    controllers.push(wireframe);
+    controllers.push(visualizeNormals);
+    controllers.push(highlightDensity);
+    controllers.push(highlightResolution);
     controllers.push(visualizeNormalSize);
 
 
@@ -113,39 +102,34 @@ function setupGui()
     const showCurvature = curvatureFolder.add(globalState.groupSettings["All Groups"], 'showCurvature').name('Show Curvature').onChange(propogateState('showCurvature'));
     controllers.push(showCurvature);
 
-
     let curvatureOptions = ['Gaussian', 'Mean', 'Max', 'Min'];
     const curvatureType = curvatureFolder.add(globalState.groupSettings["All Groups"], 'curvatureType', curvatureOptions).name('Curvature Types').onChange(propogateState('curvatureType'));
     controllers.push(curvatureType);
 
-
     // next two disabled since they're information readouts, and thus not editable
     const curvatureMin = curvatureFolder.add(globalState.groupSettings["All Groups"], 'curvatureMin').name('Curvature Min').disable().onChange(propogateState('curvatureMin'));
-    controllers.push(curvatureMin);
-
     const curvatureMax = curvatureFolder.add(globalState.groupSettings["All Groups"], 'curvatureMax').name('Curvature Max').disable().onChange(propogateState('curvatureMax'));
-    controllers.push(curvatureMax);
-
     const clampMin = curvatureFolder.add(globalState.groupSettings["All Groups"], 'clampMin').name('Clamp Min').onChange(propogateState('clampMin'));
-    controllers.push(clampMin);
-
     const clampMax = curvatureFolder.add(globalState.groupSettings["All Groups"], 'clampMax').name('Clamp Max').onChange(propogateState('clampMax'));
+
+    controllers.push(curvatureMin);
+    controllers.push(curvatureMax);
+    controllers.push(clampMin);
     controllers.push(clampMax);
 
     curvatureFolder.add({func() {}}, 'func').name('Reset Clamp');
 
 
+
     // 'Display' Section
     const displayFolder = gui.addFolder('Display').close();
     const controlMesh = displayFolder.add(globalState.groupSettings["All Groups"], 'controlMesh').name('Show Control Mesh').onChange(propogateState('controlMesh'));
-    controllers.push(controlMesh);
-
     const boundingBox = displayFolder.add(globalState.groupSettings["All Groups"], 'boundingBox').name('Show Bounding Box').onChange(propogateState('boundingBox'));
-    controllers.push(boundingBox);
-
     const showPatches = displayFolder.add(globalState.groupSettings["All Groups"], 'showPatches').name('Show Patches').onChange(propogateState('showPatches'));
-    controllers.push(showPatches);
 
+    controllers.push(controlMesh);
+    controllers.push(boundingBox);
+    controllers.push(showPatches);
 
     displayFolder.add(globalState, 'light1').name('Light 1');
     displayFolder.add(globalState, 'light2').name('Light 2');
@@ -155,18 +139,17 @@ function setupGui()
     displayFolder.add(globalState, 'patchDetail', detailOptions).name('Patch Detail');
 
 
+
     // 'Groups' Section
     const groupsFolder = gui.addFolder('Groups').close();
 
-    //let groupOptions = ['All Groups', '(unnamed group)'];
-    //groupsFolder.add(globalState, 'activeGroup', groupOptions).name('Group');
-    groupsFolder.add(globalState, 'activeGroup', Object.keys(globalState.groupSettings)).onChange(changeGroup).name('Group');
+    groupHandle = groupsFolder.add(globalState, 'activeGroup', Object.keys(globalState.groupSettings)).onChange(changeGroup).name('Group');
 
     let groupColorOptions = ['Yellow', 'Green', 'Silver', 'Red', 'Cyan', 'Magenta', 'Orange', 'Purple', 'Blue'];
     const groupColor = groupsFolder.add(globalState.groupSettings["All Groups"], 'groupColor', groupColorOptions).name('Group Color').onChange(propogateState('groupColor'));
     controllers.push(groupColor);
 
-    groupsFolder.add({func() {addGroup()}}, 'func').name('Add Group');
+    groupsFolder.add({func() {addGroup();}}, 'func').name('Add Group');
     groupsFolder.add({func() {}}, 'func').name('Delete Group');
 
 
@@ -186,7 +169,7 @@ function setupGui()
     // 'Help' Section
     const helpFolder = gui.addFolder('Help').close();
     const helpText =
-            "<b>Controls</b>\n" +
+            "Controls\n" +
             "Left Mouse: Rotate or Clip\n" +
             "Right Mouse: Pan\n" +
             "Scroll Wheel: Zoom\n" +
@@ -217,13 +200,22 @@ function propogateState(settingsKey){
     return callback;
 }
 
-// add a group to 'groupSettings', copying the settings currently in 'All Groups'
+// add a new group with the settings currently in 'All Groups'
 function addGroup() {
-    const count = Object.keys(globalState.groupSettings).length;
-    console.log(`number of groups: ${count}`);
-    globalState.groupSettings[`Group ${count}`] = structuredClone(globalState.groupSettings["All Groups"]);
-    changeGroup(`Group ${count}`);
+    const numGroups = Object.keys(globalState.groupSettings).length;
+    const groupName = `Group ${numGroups}`;
+
+    globalState.groupSettings[groupName] = structuredClone(globalState.groupSettings["All Groups"]);
+
+    // make this new group the active one
+    globalState.activeGroup = groupName;
+    groupHandle.setValue(groupName);
+    changeGroup(groupName); // necessary as setValue() doesn't trigger onChange()
+
+    // update the group options to include the new group
+    groupHandle.options(Object.keys(globalState.groupSettings));
 }
+
 
 function loadFile(file) {
     // Load the file, parse the file, update the global state, update the GUI
