@@ -438,4 +438,4 @@ function loadFile(file) {
     }
 }
 
-export { setupGui, globalState, loadFile };
+export { setupGui, globalState, loadFile, gui };

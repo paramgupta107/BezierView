@@ -17,8 +17,10 @@
         <script type="importmap">
             {
                 "imports": {
-                  "three": "https://cdn.jsdelivr.net/npm/three@0.167.1/build/three.module.js",
-                  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.167.1/examples/jsm/",
+                  "three": "https://cdn.jsdelivr.net/npm/three@0.176.0/build/three.webgpu.js",
+                  "three/webgpu": "https://cdn.jsdelivr.net/npm/three@0.176.0/build/three.webgpu.js",
+                  "three/tsl": "https://cdn.jsdelivr.net/npm/three@0.176.0/build/three.tsl.js",
+                  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.176.0/examples/jsm/",
                   "lil-gui": "https://cdn.jsdelivr.net/npm/lil-gui@0.20/+esm"
                 }
               }
@@ -26,10 +28,11 @@
         <!-- <script type="module" src = "stateManager.js"></script> -->
         <script type="module">
             import * as THREE from 'three';
-            import {globalState, setupGui, loadFile} from './stateManager.js';
+            import {globalState, setupGui, loadFile, gui} from './stateManager.js';
             import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-
+            import { BvPatch } from './BvPatch.js';
             let camera, scene, renderer, light, controls, time = 0;
+            let bvPatch;
             const clock = new THREE.Clock();
             function init(){
                 // File loader
@@ -46,7 +49,7 @@
                 // SCENE
 
                 scene = new THREE.Scene();
-                scene.background = new THREE.Color( 0xffffff );
+                scene.background = new THREE.Color( 0xeeeeee );
 
                 const gridHelper = new THREE.PolarGridHelper( 2, 16 );
 	            scene.add( gridHelper );
@@ -59,7 +62,7 @@
 
                 // RENDERER
 
-                renderer = new THREE.WebGLRenderer();
+                renderer = new THREE.WebGPURenderer();
                 renderer.setPixelRatio( window.devicePixelRatio );
                 renderer.setSize( window.innerWidth, window.innerHeight );
                 renderer.setAnimationLoop( animate );
@@ -72,6 +75,20 @@
                 // EVENTS
 
 			    window.addEventListener( 'resize', onWindowResize );
+
+                //Test
+                gui.add({'level': 2}, 'level', 0, 6, 1).name('Patch Level').onChange((value) => {
+                    bvPatch.setLevel(value);
+                    // bvPatch.needsUpdate = true;
+                });
+                const controlPoints = [
+                    -1, -1, 0, 1,
+                    -1, 1, 0, 1,
+                    1, -1, 0, 1,
+                    1, 1, 0, 1,
+                ]
+                bvPatch = new BvPatch(renderer, controlPoints, "quad", 1, 1, 2 );
+                scene.add( bvPatch );
             }
 
             function onWindowResize() {
