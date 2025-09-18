@@ -36,7 +36,6 @@ const vPassCompute = Fn ( ({geometry, uDeg, vDeg, currComputedLevel}) => {
     const gridX = int(div(instanceIndex, numQuadPerDim));
     const gridY = mod(int(instanceIndex), numQuadPerDim);
 
-
     const stride = shiftLeft(1, sub(maxLevel, int(currComputedLevel)));
     const halfstride = shiftRight(stride, int(1));
 
@@ -57,6 +56,7 @@ const vPassCompute = Fn ( ({geometry, uDeg, vDeg, currComputedLevel}) => {
         limit.assign(int(uDeg));
     });
 
+    //Loop( { start: 0, end: int(limit), type: 'int', name: 'iteration', condition: '<=', update: int(uDeg) }, ( { iteration } ) => {
     Loop( { start: 0, end: int(limit), type: 'int', name: 'iteration', condition: '<=', update: int(uDeg) }, ( { iteration } ) => {
 
         Loop( { start: 0, end: int(vDeg), type: 'int', name: 'i', condition: '<' }, ( { i } ) => {
@@ -71,6 +71,7 @@ const vPassCompute = Fn ( ({geometry, uDeg, vDeg, currComputedLevel}) => {
                 const p2  = int(flatternInstanceIndex(xtemp, add(ytemp, stride)));
 
                 positionStorageAttribute.element(mid).assign(div(add(positionStorageAttribute.element(p1), positionStorageAttribute.element(p2)), float(2)));
+                //positionStorageAttribute.element(0).assign(div(add(positionStorageAttribute.element(p1), positionStorageAttribute.element(p2)), float(2)));
 
             } );
 
@@ -100,6 +101,8 @@ const vPassCompute = Fn ( ({geometry, uDeg, vDeg, currComputedLevel}) => {
         } );
 
     } );
+    /*
+    */
 
 });
 
@@ -152,7 +155,7 @@ const uPassCompute = Fn ( ({geometry, uDeg, vDeg, currComputedLevel}) => {
 
     } );
 
-    // part 2: midriff
+    // part 2: midsection
 
     Loop( { start: 1, end: mul(vDeg, 2), type: 'int', name: 'iteration', condition: '<' }, ( { iteration } ) => {
 
@@ -313,8 +316,9 @@ export class BvPatch extends THREE.Mesh {
     this.geometry.setAttribute( 'cpAttribute', this.cpBuffer );
     console.log(this.geometry.getAttribute('cpAttribute').count);
 
-    const positionStorageBufferAttribute = new THREE.StorageBufferAttribute( (((this.uDeg * 64) + 1) * ((this.vDeg * 64) + 1)), 3 );
+    const positionStorageBufferAttribute = new THREE.StorageBufferAttribute( (((this.uDeg * 64) + 1) * ((this.vDeg * 64) + 1)), 4 );
     this.geometry.setAttribute( 'position', positionStorageBufferAttribute );
+
     console.log(this.geometry.attributes.position.count, "vertices");
 
     this.currVersion = 0;
@@ -322,15 +326,140 @@ export class BvPatch extends THREE.Mesh {
         color: 0xff0000,
         wireframe: true
     });
-    this.#initializeQuadPatch().then(() => {this.setLevel(initialLevel);});
-
-
+    //this.#initializeQuadPatch().then(() => {this.setLevel(initialLevel);});
+    this.initializeQuadPatchJS();
+    this.geometry.setIndex(generateFixedBufferGridIndices(0, this.uDeg, this.vDeg));
+    this.setLevel(initialLevel);
   }
+
+    initializeQuadPatchJS() {
+        const controlPts = this.geometry.getAttribute('cpAttribute').array;
+        const positions = this.geometry.getAttribute('position').array;
+
+        for (let i = 0; i <= this.uDeg; i++) {
+            for (let j = 0; j <= this.uDeg; j++) {
+                const src = 4 * ((i * (this.vDeg+1)) + j);
+                const dst = 4 * (((i * 64) * (1 + (this.vDeg*64))) + (j * 64));
+
+
+                positions[dst] = controlPts[src];
+                positions[dst + 1] = controlPts[src + 1];
+                positions[dst + 2] = controlPts[src + 2];
+                positions[dst + 3] = controlPts[src + 3];
+
+                /*
+                console.log("src idx: ", src);
+                console.log("dst idx: ", dst);
+                console.log(`(${positions[dst]}, ${positions[dst+1]}, ${positions[dst+2]}, ${positions[dst+3]})`);
+                */
+            }
+        }
+    }
+
+    vPassJS(instanceIndex) {
+        const maxLevel = 6;
+
+        const numQuadPerDim = (1 << this.currComputedLevel);
+        const gridX = Math.floor(instanceIndex / numQuadPerDim);
+        const gridY = instanceIndex % numQuadPerDim;
+
+        const stride = 1 << (maxLevel - this.currComputedLevel);
+        const halfstride = stride >> 1;
+
+        const bufferSize = (this.vDeg * (2 ** maxLevel)) + 1;
+        const flatternInstanceIndex = (i, j) => (i * bufferSize) + j;
+
+        const x = (gridX * (stride * this.uDeg));
+        const y = (gridY * (stride * this.vDeg));
+
+        const bigArray = this.geometry.getAttribute('position').array;
+
+        // skip one of the edges unless this quad is itself on the edge of the patch
+        let limit = this.uDeg - 1;
+        if (gridX === (numQuadPerDim - 1))
+            limit = this.uDeg;
+
+        for (let iteration = 0; iteration <= limit; iteration++) {
+
+            for (let i = 0; i < this.vDeg; i++) {
+
+                for (let j = i; j < this.vDeg; j++) {
+
+                    const xtemp = x + (stride * iteration);
+                    const ytemp = y + ((halfstride * i) + ((j-i) * stride));
+
+                    // multiplied by 4 because each xyzw point we're accessing
+                    // is just 4 values in memory next to each other
+                    const p1  = 4 * flatternInstanceIndex(xtemp, ytemp);
+                    const mid = 4 * flatternInstanceIndex(xtemp, ytemp + halfstride);
+                    const p2  = 4 * flatternInstanceIndex(xtemp, ytemp + stride);
+
+                    bigArray[mid]     = (bigArray[p1] + bigArray[p2]) / 2.0;
+                    bigArray[mid + 1] = (bigArray[p1 + 1] + bigArray[p2 + 1]) / 2.0;
+                    bigArray[mid + 2] = (bigArray[p1 + 2] + bigArray[p2 + 2]) / 2.0;
+                    bigArray[mid + 3] = (bigArray[p1 + 3] + bigArray[p2 + 3]) / 2.0;
+                }
+            }
+        }
+
+        this.geometry.getAttribute('position').needsUpdate = true;
+
+    }
+
+    uPassJS(instanceIndex) {
+        const maxLevel = 6;
+
+        const numQuadPerDim = (1 << this.currComputedLevel);
+        const gridX = Math.floor(instanceIndex / numQuadPerDim);
+        const gridY = instanceIndex % numQuadPerDim;
+
+        const stride = 1 << (maxLevel - this.currComputedLevel);
+        const halfstride = stride >> 1;
+
+        const bufferSize = (this.vDeg * (1 << maxLevel)) + 1;
+        const flatternInstanceIndex = (i, j) => (i * bufferSize) + j;
+
+        const x = (gridX * (stride * this.uDeg));
+        const y = (gridY * (stride * this.vDeg));
+
+        const bigArray = this.geometry.getAttribute('position').array;
+
+        // skip one of the edges unless this quad is itself on the edge of the patch
+        let limit = (this.uDeg*2) - 1;
+        if (gridY === (numQuadPerDim - 1)) {
+            limit = this.uDeg*2;
+        }
+
+        for (let iteration = 0; iteration <= limit; iteration++) {
+
+            for (let i = 0; i < this.uDeg; i++) {
+
+                for (let j = i; j < this.uDeg; j++) {
+
+                    const ytemp = y + (halfstride * iteration);
+                    const xtemp = x + ((halfstride * i) + ((j-i) * stride));
+
+                    // multiplied by 4 because we're accessing each xyzw point
+                    // as just 4 values in memory next to each other
+                    const p1  = 4 * flatternInstanceIndex(xtemp, ytemp);
+                    const mid = 4 * flatternInstanceIndex(xtemp + halfstride, ytemp);
+                    const p2  = 4 * flatternInstanceIndex(xtemp + stride, ytemp);
+
+                    bigArray[mid]     = (bigArray[p1] + bigArray[p2]) / 2.0;
+                    bigArray[mid + 1] = (bigArray[p1 + 1] + bigArray[p2 + 1]) / 2.0;
+                    bigArray[mid + 2] = (bigArray[p1 + 2] + bigArray[p2 + 2]) / 2.0;
+                    bigArray[mid + 3] = (bigArray[p1 + 3] + bigArray[p2 + 3]) / 2.0;
+                }
+            }
+        }
+
+        this.geometry.getAttribute('position').needsUpdate = true;
+    }
 
   async #initializeQuadPatch() {
     // Use compute shader to set values of positionBuffer and normal Buffer. Also create buffers for curvatures.
 
-    const compute = initializeQuadPatchCompute({geometry: this.geometry, uDeg: this.uDeg, vDeg: this.vDeg}).compute(1)
+    const compute = initializeQuadPatchCompute({geometry: this.geometry, uDeg: this.uDeg, vDeg: this.vDeg}).compute(1);
 
     this.geometry.setIndex(generateFixedBufferGridIndices(0, this.uDeg, this.vDeg));
     return this.renderer.computeAsync( compute );
@@ -374,14 +503,28 @@ export class BvPatch extends THREE.Mesh {
 
     }else{
         for( let i = this.currComputedLevel; i < level; i++) {
-            //await this.#subDivideQuadPatch();
+            // 1. pass across the v direction
+            //await this.#vPass();
 
-            //// 1. pass across the v direction
-            await this.#vPass();
             //// 2. pass across the u direction
-            await this.#uPass();
+            //await this.#uPass();
 
-            this.currComputedLevel += 1;
+            //await this.#exampleShader();
+
+            // temp JS version
+            // one loop goes 0 -> max instance index,
+            // the other goes max instance index -> 0 to check that behavior
+            // isn't dependent on running in a certain order
+            for ( let instanceIndex = 0; instanceIndex < ((1 << this.currComputedLevel) * (1 << this.currComputedLevel)); instanceIndex++) {
+            //for ( let instanceIndex = ((1 << this.currComputedLevel) * (1 << this.currComputedLevel))-1; instanceIndex >= 0; instanceIndex--) {
+                this.vPassJS(instanceIndex);
+            }
+
+            //for ( let instanceIndex = 0; instanceIndex < ((1 << this.currComputedLevel) * (1 << this.currComputedLevel)); instanceIndex++) {
+            for ( let instanceIndex = ((1 << this.currComputedLevel) * (1 << this.currComputedLevel))-1; instanceIndex >= 0; instanceIndex--) {
+                this.uPassJS(instanceIndex);
+            }
+                this.currComputedLevel += 1;
         }
         this.currLevel = level;
         this.currComputedLevel = level;

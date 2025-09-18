@@ -17,10 +17,10 @@
         <script type="importmap">
             {
                 "imports": {
-                  "three": "https://cdn.jsdelivr.net/npm/three@0.179.0/build/three.webgpu.js",
-                  "three/webgpu": "https://cdn.jsdelivr.net/npm/three@0.179.0/build/three.webgpu.js",
-                  "three/tsl": "https://cdn.jsdelivr.net/npm/three@0.179.0/build/three.tsl.js",
-                  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.179.0/examples/jsm/",
+                  "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.webgpu.js",
+                  "three/webgpu": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.webgpu.js",
+                  "three/tsl": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.tsl.js",
+                  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
                   "lil-gui": "https://cdn.jsdelivr.net/npm/lil-gui@0.20/+esm"
                 }
               }
@@ -77,7 +77,7 @@
 			    window.addEventListener( 'resize', onWindowResize );
 
                 //Test
-                gui.add({'level': 2}, 'level', 0, 6, 1).name('Patch Level').onChange((value) => {
+                gui.add({'level': 1}, 'level', 0, 6, 1).name('Patch Level').onChange((value) => {
                     bvPatch.setLevel(value);
                     // bvPatch.needsUpdate = true;
                 });
@@ -92,6 +92,12 @@
                     -1, 1, 2, 1,
                     1, -1, 2, 1,
                     1, 1, 2, 1,
+                ]
+                const test7 = [
+                    -1, -1, 0, 1,
+                    -1,  1, 0, 1,
+                     1, -1, -1, 1,
+                     1,  1, 1, 1,
                 ]
                 const deg2x3 = [
                     -1.5,  1.0,  0.0, 1,
@@ -170,14 +176,28 @@
                     2,  0, 1, 1,
                     2,  0, 2, 1,
                 ]
+                const test8 =  [
+                    0,  0, 0, 1,
+                    0,  0, 1, 1,
+                    0,  0, 2, 1,
+
+                    1,  0, 0, 1,
+                    1,  0, 1, 1,
+                    1,  0, 2, 1,
+
+                    2,  0, 0, 1,
+                    2, 10, 1, 1,
+                    2,  0, 2, 1,
+                ]
                 //bvPatch = new BvPatch(renderer, controlPoints, "quad", 1, 1, 2 );
                 //bvPatch = new BvPatch(renderer, controlPointsOffset, "quad", 1, 1, 1 );
                 //bvPatch = new BvPatch(renderer, deg2x3, "quad", 2, 3, 2 );
                 //bvPatch = new BvPatch(renderer, deg1x2, "quad", 1, 2, 2 );
                 //bvPatch = new BvPatch(renderer, bi3, "quad", 3, 3, 2 );
-                bvPatch = new BvPatch(renderer, rat1, "quad", 2, 2, 2 );
+                bvPatch = new BvPatch(renderer, rat1, "quad", 2, 2, 1 );
                 //bvPatch = new BvPatch(renderer, test5, "quad", 2, 2, 1);
                 //bvPatch = new BvPatch(renderer, test6, "quad", 2, 2, 1);
+                //bvPatch = new BvPatch(renderer, test8, "quad", 2, 2, 1);
 
                 scene.add( bvPatch );
             }
