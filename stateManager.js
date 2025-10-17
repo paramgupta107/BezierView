@@ -202,6 +202,8 @@ function propogateState(settingsKey){
 // Load the file, parse the file, update the global state, update the GUI
 function loadFile(file) {
 
+    console.log("load file running");
+
     if (file) {
         const reader = new FileReader();
         reader.onload = function(event) {
@@ -420,6 +422,7 @@ function loadFile(file) {
             if (groupSettingsLocal['(unnamed group)'].patches.length === 0) {
                 delete groupSettingsLocal['(unnamed group)'];
             }
+            console.log(groupSettingsLocal);
 
             // only get to this point if we don't throw an error somewhere else;
             // thus, it should now be safe to change the global state
@@ -435,6 +438,9 @@ function loadFile(file) {
             groupHandle.options(Object.keys(globalState.groupSettings));
         }
         reader.readAsText(file);
+    }
+    else {
+        console.log("file inavlid");
     }
 }
 

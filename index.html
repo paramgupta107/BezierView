@@ -25,21 +25,27 @@
                 }
               }
         </script>
-        <!-- <script type="module" src = "stateManager.js"></script> -->
         <script type="module">
             import * as THREE from 'three';
+            import {BvLoader} from './BvLoader.js';
             import {globalState, setupGui, loadFile, gui} from './stateManager.js';
             import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
             import { BvPatch } from './BvPatch.js';
             let camera, scene, renderer, light, controls, time = 0;
             let bvPatch;
+            let bvModel; // hold the currently loaded model
             const clock = new THREE.Clock();
             function init(){
-                // File loader
-                document.getElementById('fileInput').addEventListener('change', (event) => {loadFile(event.target.files[0])});
-                // GUI
 
+                // GUI
                 setupGui();
+                //TODO: listen for changes on the 'Choose Model' controller
+                // 'Choose Model' setting is in the first folder 'Load File' and is the first controller in the folder
+                //let chooseModelHandle = gui.children[0].children[0];
+                // alternative should the order of things change
+                //let temp = gui.children.find((folder) => folder._title === "Load File").children.find((controller) => controller._name === "Choose Model");
+
+                console.log(gui.children[0]._title);
 
                 // CAMERA
 
@@ -76,11 +82,50 @@
 
 			    window.addEventListener( 'resize', onWindowResize );
 
+                // File loader
+                const bvLoader = new BvLoader(THREE.DefaultLoadingManager, renderer);
+                let chooseModelHandle = gui.children[0].children[0];
+
+                document.getElementById('fileInput').addEventListener('change', (event) => {
+                    loadBVFile(event);
+                });
+
+                function loadBVFile(event) {
+                    const file = event.target.files[0];
+
+                    if (!file) {
+                        console.log("Error loading file");
+                        return;
+                    }
+
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        console.log("file loaded");
+
+                        // remove the old model (if there is one)
+                        if (bvModel)
+                            scene.remove(bvModel);
+
+                        // just the bv file's text
+                        const text = event.target.result;
+                        bvModel = bvLoader.parse(text);
+                        scene.add(bvModel);
+
+                        // TODO: update the GUI now that a new model has been loaded (groups section, etc)
+                    }
+                    reader.readAsText(file);
+                }
+
                 //Test
                 gui.add({'level': 1}, 'level', 0, 6, 1).name('Patch Level').onChange((value) => {
-                    bvPatch.setLevel(value);
-                    // bvPatch.needsUpdate = true;
+                    bvModel.children.forEach(group => {
+                        group.children.forEach(patch => {
+                            patch.setLevel(value);
+                        })
+                    })
                 });
+
+                /*
                 const controlPoints = [
                     -1, -1, 0, 1,
                     -1, 1, 0, 1,
@@ -200,6 +245,7 @@
                 //bvPatch = new BvPatch(renderer, test8, "quad", 2, 2, 1);
 
                 scene.add( bvPatch );
+                */
             }
 
             function onWindowResize() {

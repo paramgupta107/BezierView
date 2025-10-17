@@ -314,12 +314,12 @@ export class BvPatch extends THREE.Mesh {
 
     this.cpBuffer = new THREE.Float32BufferAttribute(controlPts, 4, false);
     this.geometry.setAttribute( 'cpAttribute', this.cpBuffer );
-    console.log(this.geometry.getAttribute('cpAttribute').count);
+    //console.log(this.geometry.getAttribute('cpAttribute').count);
 
     const positionStorageBufferAttribute = new THREE.StorageBufferAttribute( (((this.uDeg * 64) + 1) * ((this.vDeg * 64) + 1)), 4 );
     this.geometry.setAttribute( 'position', positionStorageBufferAttribute );
 
-    console.log(this.geometry.attributes.position.count, "vertices");
+    //console.log(this.geometry.attributes.position.count, "vertices");
 
     this.currVersion = 0;
     this.material = new THREE.MeshBasicMaterial({
