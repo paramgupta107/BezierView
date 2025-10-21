@@ -34,18 +34,13 @@
             let camera, scene, renderer, light, controls, time = 0;
             let bvPatch;
             let bvModel; // hold the currently loaded model
+            let bvLoader;
             const clock = new THREE.Clock();
             function init(){
 
                 // GUI
-                setupGui();
-                //TODO: listen for changes on the 'Choose Model' controller
-                // 'Choose Model' setting is in the first folder 'Load File' and is the first controller in the folder
-                //let chooseModelHandle = gui.children[0].children[0];
-                // alternative should the order of things change
-                //let temp = gui.children.find((folder) => folder._title === "Load File").children.find((controller) => controller._name === "Choose Model");
 
-                console.log(gui.children[0]._title);
+                setupGui();
 
                 // CAMERA
 
@@ -83,14 +78,40 @@
 			    window.addEventListener( 'resize', onWindowResize );
 
                 // File loader
-                const bvLoader = new BvLoader(THREE.DefaultLoadingManager, renderer);
+                bvLoader = new BvLoader(THREE.DefaultLoadingManager, renderer);
                 let chooseModelHandle = gui.children[0].children[0];
 
-                document.getElementById('fileInput').addEventListener('change', (event) => {
-                    loadBVFile(event);
-                });
+                function updateGUIAfterLoad(newModel) {
+                    let groupSettingsLocal = {};
+                    groupSettingsLocal["All Groups"] = structuredClone(globalState.groupSettings["All Groups"]);
 
-                function loadBVFile(event) {
+                    // create a new entry for each of the groups found
+                    bvModel.children.forEach(group => {
+                        groupSettingsLocal[group.name] = structuredClone(groupSettingsLocal["All Groups"]);
+                    })
+                    // and add those new entries as options in the list
+                    let groupHandle = gui.children.find((folder) => folder._title === "Groups").children.find((controller) => controller._name === "Group");
+
+                    // update the real global state with the new information
+                    globalState.groupSettings = structuredClone(groupSettingsLocal);
+                    globalState.activeGroup = 'All Groups';
+                    groupHandle.options(Object.keys(globalState.groupSettings));
+                }
+
+                // wrapper around the BvLoader "load" function
+                function loadLocalModel(url) {
+                    bvLoader.load(url, ((model) => {
+                        if (bvModel)
+                            scene.remove(bvModel);
+
+                        bvModel = model;
+                        scene.add(bvModel);
+                        updateGUIAfterLoad(bvModel);
+                    }));
+                }
+
+                // Listen for when a file is uploaded by the user
+                document.getElementById('fileInput').addEventListener('change', (event) => {
                     const file = event.target.files[0];
 
                     if (!file) {
@@ -100,21 +121,45 @@
 
                     const reader = new FileReader();
                     reader.onload = (event) => {
-                        console.log("file loaded");
-
-                        // remove the old model (if there is one)
-                        if (bvModel)
-                            scene.remove(bvModel);
-
-                        // just the bv file's text
-                        const text = event.target.result;
-                        bvModel = bvLoader.parse(text);
+                        let oldModel = bvModel;
+                        bvModel = bvLoader.parse(event.target.result);
+                        // if there was an old model, and parsing succeeded, remove it
+                        if (oldModel)
+                            scene.remove(oldModel);
                         scene.add(bvModel);
-
-                        // TODO: update the GUI now that a new model has been loaded (groups section, etc)
+                        updateGUIAfterLoad(bvModel);
                     }
                     reader.readAsText(file);
-                }
+                });
+
+                // Listen for when the user selects one of the preset models
+                let presets = gui.children.find((folder) => folder._title === "Load File").children.find((controller) => controller._name === "Choose Model");
+                presets.onChange((event) => {
+                    switch(event) {
+                        case "Logo":
+                            loadLocalModel("./data/logo.bv");
+                            break;
+                        case "Teapot":
+                            loadLocalModel("./data/tpt_grp.bv");
+                            break;
+                        case "Hexoid":
+                            loadLocalModel("./data/hex.bv");
+                            break;
+                        case "Cube, G2":
+                            loadLocalModel("./data/cubeg2.bv");
+                            break;
+                        case "Male Head":
+                            loadLocalModel("./data/male_head.bv");
+                            break;
+                    }
+                });
+
+                // Set model to logo by default
+                // TODO: this is quite slow; parsing is fast but creating and adding 540 new patch objects is not
+                loadLocalModel('./data/logo.bv');
+
+                // TODO: pass initial patch subdiv level to the BvLoader or, after loading, set the level of all patches
+                // to the currently selected level
 
                 //Test
                 gui.add({'level': 1}, 'level', 0, 6, 1).name('Patch Level').onChange((value) => {
@@ -124,128 +169,6 @@
                         })
                     })
                 });
-
-                /*
-                const controlPoints = [
-                    -1, -1, 0, 1,
-                    -1, 1, 0, 1,
-                    1, -1, 0, 1,
-                    1, 1, 0, 1,
-                ]
-                const controlPointsOffset = [
-                    -1, -1, 2, 1,
-                    -1, 1, 2, 1,
-                    1, -1, 2, 1,
-                    1, 1, 2, 1,
-                ]
-                const test7 = [
-                    -1, -1, 0, 1,
-                    -1,  1, 0, 1,
-                     1, -1, -1, 1,
-                     1,  1, 1, 1,
-                ]
-                const deg2x3 = [
-                    -1.5,  1.0,  0.0, 1,
-                    -0.5,  1.0,  0.0, 1,
-                     0.5,  1.0,  0.0, 1,
-                     1.5,  1.0,  0.0, 1,
-                    -1.5,  0.0,  0.0, 1,
-                    -0.5,  0.0,  0.5, 1,
-                     0.5,  0.0,  0.5, 1,
-                     1.5,  0.0,  0.0, 1,
-                    -1.5, -1.0,  0.0, 1,
-                    -0.5, -1.0,  0.0, 1,
-                     0.5, -1.0,  0.0, 1,
-                     1.5, -1.0,  0.0, 1,
-                ]
-                const deg1x2 = [
-                    -1, -1, 0, 1,
-                     0, -1, 0, 1,
-                     1, -1, 0, 1,
-                    -1,  1, 0, 1,
-                     0,  1, 0, 1,
-                     1,  1, 0, 1,
-                ]
-                const bi3 = [
-                    -1.5,  1.5, 0.0, 1,
-                    -0.5,  1.5, 0.0, 1,
-                     0.5,  1.5, 0.0, 1,
-                     1.5,  1.5, 0.0, 1,
-                    -1.5,  0.5, 0.0, 1,
-                    -0.5,  0.5, 0.5, 1,
-                     0.5,  0.5, 0.5, 1,
-                     1.5,  0.5, 0.0, 1,
-                    -1.5, -0.5, 0.0, 1,
-                    -0.5, -0.5, 0.5, 1,
-                     0.5, -0.5, 0.5, 1,
-                     1.5, -0.5, 0.0, 1,
-                    -1.5, -1.5, 0.0, 1,
-                    -0.5, -1.5, 0.0, 1,
-                     0.5, -1.5, 0.0, 1,
-                     1.5, -1.5, 0.0, 1,
-                ]
-                const rat1 = [
-                    -2, -2,  2, 1,
-                    -3,  0,  3, 1,
-                    -2,  2,  2, 1,
-                     0, -3,  3, 1,
-                     0,  0, 24, 2,
-                     0,  3,  3, 1,
-                     2, -2,  2, 1,
-                     3,  0,  3, 1,
-                     2,  2,  2, 1,
-                ]
-                const test5 = [
-                    0,  0, 0, 1,
-                    0, 10, 1, 1,
-                    0,  0, 2, 1,
-
-                    1,  0, 0, 1,
-                    1, 10, 1, 1,
-                    1,  0, 2, 1,
-
-                    2,  0, 0, 1,
-                    2, 10, 1, 1,
-                    2,  0, 2, 1,
-                ]
-                const test6 = [
-                    0,  0, 0, 1,
-                    0,  0, 1, 1,
-                    0,  0, 2, 1,
-
-                    1, 10, 0, 1,
-                    1, 10, 1, 1,
-                    1, 10, 2, 1,
-
-                    2,  0, 0, 1,
-                    2,  0, 1, 1,
-                    2,  0, 2, 1,
-                ]
-                const test8 =  [
-                    0,  0, 0, 1,
-                    0,  0, 1, 1,
-                    0,  0, 2, 1,
-
-                    1,  0, 0, 1,
-                    1,  0, 1, 1,
-                    1,  0, 2, 1,
-
-                    2,  0, 0, 1,
-                    2, 10, 1, 1,
-                    2,  0, 2, 1,
-                ]
-                //bvPatch = new BvPatch(renderer, controlPoints, "quad", 1, 1, 2 );
-                //bvPatch = new BvPatch(renderer, controlPointsOffset, "quad", 1, 1, 1 );
-                //bvPatch = new BvPatch(renderer, deg2x3, "quad", 2, 3, 2 );
-                //bvPatch = new BvPatch(renderer, deg1x2, "quad", 1, 2, 2 );
-                //bvPatch = new BvPatch(renderer, bi3, "quad", 3, 3, 2 );
-                bvPatch = new BvPatch(renderer, rat1, "quad", 2, 2, 1 );
-                //bvPatch = new BvPatch(renderer, test5, "quad", 2, 2, 1);
-                //bvPatch = new BvPatch(renderer, test6, "quad", 2, 2, 1);
-                //bvPatch = new BvPatch(renderer, test8, "quad", 2, 2, 1);
-
-                scene.add( bvPatch );
-                */
             }
 
             function onWindowResize() {
@@ -267,6 +190,7 @@
             }
 
             init();
+
         </script>
     </body>
 </html>

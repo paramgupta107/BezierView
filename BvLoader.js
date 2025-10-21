@@ -80,6 +80,10 @@ class BvLoader extends Loader {
 
 	}
 
+    loadAsync(url, onProgress) {
+        return new Promise((resolve, reject) => { this.load(url, resolve, onProgress, reject); });
+    }
+
 	/**
 	 * Sets the material creator for this OBJ. This object is loaded via {@link MTLLoader}.
 	 *
@@ -177,7 +181,7 @@ class BvLoader extends Loader {
                     let numPoints = (deg_u + 1) * (deg_v + 1);
                     let controlPoints = readPoints(numPoints, patchType === 8);
 
-                    let myNewPatch = new BvPatch(this.renderer, controlPoints, patchType, deg_u, deg_v, 2);
+                    let myNewPatch = new BvPatch(this.renderer, controlPoints, patchType, deg_u, deg_v, 0);
                     currentGroup.add(myNewPatch);
 
                     break;

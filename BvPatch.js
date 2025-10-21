@@ -497,7 +497,7 @@ export class BvPatch extends THREE.Mesh {
   }
 
   async setLevel(level) {
-    console.log(level, this.currComputedLevel, this.geometry.index.version, this.currVersion);
+    //console.log(level, this.currComputedLevel, this.geometry.index.version, this.currVersion);
     if(this.currComputedLevel >= level){
         this.currLevel = level;
 
