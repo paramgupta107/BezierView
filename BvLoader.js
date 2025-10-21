@@ -120,6 +120,17 @@ class BvLoader extends Loader {
 
         let currentGroup = unnamed;
 
+        // cycle through different colors for different groups
+        let curGroupNum = 0;
+        // Yellow, Green, Silver, Red, Cyan, Magenta, Orange, Purple, Blue
+        const groupColors = [
+          0xb2b219, 0x19b219,
+          0xbfbfbf, 0xb21919,
+          0x19b2b2, 0xb219b2,
+          0xb26619, 0x661966,
+          0x1919b2
+        ];
+
         // utility fn to read xyz/xyzw points from the file
         function readPoints(numPoints, isRational) {
             let points = [];
@@ -155,6 +166,7 @@ class BvLoader extends Loader {
                     let newGroup = new Group();
                     newGroup.name = groupName;
                     root.add(newGroup);
+                    curGroupNum = (groupID-1) % groupColors.length;
                 }
 
                 // set this group as the current one
@@ -181,8 +193,8 @@ class BvLoader extends Loader {
                     let numPoints = (deg_u + 1) * (deg_v + 1);
                     let controlPoints = readPoints(numPoints, patchType === 8);
 
-                    let myNewPatch = new BvPatch(this.renderer, controlPoints, patchType, deg_u, deg_v, 0);
-                    currentGroup.add(myNewPatch);
+                    let patch = new BvPatch(this.renderer, controlPoints, patchType, deg_u, deg_v, groupColors[curGroupNum]);
+                    currentGroup.add(patch);
 
                     break;
                 }

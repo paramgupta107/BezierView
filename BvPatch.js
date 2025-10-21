@@ -302,7 +302,7 @@ function generateFixedBufferGridIndices(n, uDeg, vDeg) {
 
 
 export class BvPatch extends THREE.Mesh {
-  constructor(renderer, controlPts, patchType, uDeg, vDeg, initialLevel = 0) {
+  constructor(renderer, controlPts, patchType, uDeg, vDeg, inColor, initialLevel = 0) {
     super();
     this.renderer = renderer;
     this.patchType = patchType;
@@ -322,8 +322,9 @@ export class BvPatch extends THREE.Mesh {
     //console.log(this.geometry.attributes.position.count, "vertices");
 
     this.currVersion = 0;
+    // TODO: change the material type from MeshBasicMaterial, which only has flat shading
     this.material = new THREE.MeshBasicMaterial({
-        color: 0xff0000,
+        color: inColor,
         wireframe: true
     });
     //this.#initializeQuadPatch().then(() => {this.setLevel(initialLevel);});
