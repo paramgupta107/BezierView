@@ -17,10 +17,10 @@
         <script type="importmap">
             {
                 "imports": {
-                  "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.webgpu.js",
-                  "three/webgpu": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.webgpu.js",
-                  "three/tsl": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.tsl.js",
-                  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
+                  "three": "https://cdn.jsdelivr.net/npm/three@0.184.0/build/three.webgpu.js",
+                  "three/webgpu": "https://cdn.jsdelivr.net/npm/three@0.184.0/build/three.webgpu.js",
+                  "three/tsl": "https://cdn.jsdelivr.net/npm/three@0.184.0/build/three.tsl.js",
+                  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.184.0/examples/jsm/",
                   "lil-gui": "https://cdn.jsdelivr.net/npm/lil-gui@0.20/+esm"
                 }
               }
@@ -33,7 +33,7 @@
             import { BvPatch } from './BvPatch.js';
             let camera, scene, renderer, light, controls, time = 0;
             let bvPatch;
-            const clock = new THREE.Clock();
+            const timer = new THREE.Timer();
             function init(){
                 // File loader
                 document.getElementById('fileInput').addEventListener('change', (event) => {loadFile(event.target.files[0])});
@@ -214,7 +214,7 @@
 
             function render() {
 
-                const delta = clock.getDelta();
+                const delta = timer.getDelta();
                 time += delta;
                 // render
                 renderer.render( scene, camera );
