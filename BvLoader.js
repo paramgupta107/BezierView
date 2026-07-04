@@ -2,7 +2,8 @@ import {
 	FileLoader,
 	Group,
 	Loader
-} from 'three';
+} from 'three/webgpu';
+import { BvPatch } from './BvPatch.js';
 
 /**
  * A loader for the Bv format.
@@ -25,11 +26,14 @@ class BvLoader extends Loader {
 	 * Constructs a new Bv loader.
 	 *
 	 * @param {LoadingManager} [manager] - The loading manager.
+	 * @param {WebGPURenderer} [renderer] - The renderer for the scene.
 	 */
-	constructor( manager ) {
+	// BvPatch objects need a handle to the renderer, and so this loader does too to create the BvPatch objects
+	constructor( manager, renderer ) {
 
 		super( manager );
 
+		this.renderer = renderer;
 		this.materials = null;
 
 	}
@@ -98,15 +102,114 @@ class BvLoader extends Loader {
 	 * @return {Group} The parsed Bv.
 	 */
 	parse( text ) {
+		console.log("parsing file");
 
-		const container = new Group();
+		// 'root' group, holds the BezierView groups that get found in parsing
+		const root = new Group();
 
-        // Create a Patch. Enable contorl mesh and normals if this.materials is null
-        // Assign material based on patch group. Only do that if this.materials is null otherwise use this.materials
-		container.add( patch );
+		let input = text.split(/\s+/);
+		let idx = 0;
 
-		return container;
+		// create a default group in case none are specified in the file
+		const unnamed = new Group();
+		unnamed.name = "(unnamed group)";
+		root.add(unnamed);
 
+		let currentGroup = unnamed;
+
+		// utility fn to read xyz/xyzw points from the file
+		function readPoints(numPoints, isRational) {
+			let points = [];
+			// if the patch is rational, we need to read a 4th value
+			if (isRational) {
+				for (let i = 0; i < numPoints; i++) {
+					points.push(Number(input[idx++]));
+					points.push(Number(input[idx++]));
+					points.push(Number(input[idx++]));
+					points.push(Number(input[idx++]));
+				}
+				// if the patch isn't rational, make every 4th value 1
+			} else {
+				for (let i = 0; i < numPoints; i++) {
+					points.push(Number(input[idx++]));
+					points.push(Number(input[idx++]));
+					points.push(Number(input[idx++]));
+					points.push(1);
+				}
+			}
+			return points;
+		}
+
+		while (idx < input.length && input[idx] != '') {
+			// check for the start of a group
+			if (input[idx].toUpperCase() == "GROUP") {
+				let groupID = Number(input[++idx]);
+				let groupName = input[++idx];
+				//console.log("group with ID", groupID, "and name", groupName);
+
+				// if this group doesn't exist, create it
+				if (!root.getObjectByName(groupName)) {
+					let newGroup = new Group();
+					newGroup.name = groupName;
+					root.add(newGroup);
+				}
+
+				// set this group as the current one
+				currentGroup = root.getObjectByName(groupName);
+				idx++;
+			}
+
+			// whether we just read a group label or not, should now hit the start of a patch
+			let patchType = Number(input[idx++]);
+
+			switch (patchType) {
+				// tensor products
+				case 4: // square (deg_u == deg_v)
+				case 5: // quad (deg_u independent of deg_v)
+				case 8: { // rational, 4th value to read
+					let deg_u, deg_v;
+					if (patchType == 4) {
+						deg_u = deg_u = Number(input[idx]);
+						deg_v = deg_v = Number(input[idx++]);
+					} else {
+						deg_u = Number(input[idx++]);
+						deg_v = Number(input[idx++]);
+					}
+					let numPoints = (deg_u + 1) * (deg_v + 1);
+					let controlPoints = readPoints(numPoints, patchType === 8);
+
+					// let myNewPatch = new BvPatch(this.renderer, controlPoints, patchType, deg_u, deg_v, 2);
+					let myNewPatch = new BvPatch(this.renderer, controlPoints, patchType, deg_u, deg_v, 0);
+					currentGroup.add(myNewPatch);
+
+					break;
+				}
+				default: {
+					throw new Error("TODO");
+				}
+			}
+		}
+
+		// check if 'unnamed group' went unused (ie, if all data was stored in named groups), and remove it if did
+		if (root.getObjectByName("(unnamed group)").children.length === 0) {
+			root.remove(root.getObjectByName("(unnamed group)"));
+		}
+
+		// set level of all meshes at once
+		const init_level = 2
+		const all_passes = []
+		for (const group of root.children) {
+			for (const patch of group.children) {
+				all_passes.push(...patch.getLevelPasses(2))
+			}
+		}
+		if (all_passes.length !== 0)
+			this.renderer.compute(all_passes);
+
+		// Create a Patch. Enable contorl mesh and normals if this.materials is null
+		// Assign material based on patch group. Only do that if this.materials is null otherwise use this.materials
+
+		return root;
 	}
 
 }

@@ -1,5 +1,5 @@
-import * as THREE from 'three';
-import { vec3, storage, Fn, If, Loop, equal, notEqual, uniform, instanceIndex, objectWorldMatrix, color, screenUV, attribute, mul, add, sub, div, mod, shiftLeft, shiftRight, floor, abs, uint, int, float} from 'three/tsl';
+import * as THREE from 'three/webgpu';
+import { vec3, storage, Fn, If, Loop, greaterThan, equal, notEqual, uniform, instanceIndex, objectWorldMatrix, color, screenUV, attribute, mul, add, sub, div, mod, shiftLeft, shiftRight, floor, abs, uint, int, float} from 'three/tsl';
 
 const initializeQuadPatchCompute = Fn ( ({geometry, uDeg, vDeg}) => {
     const psAttribute = geometry.attributes.position;
@@ -31,71 +31,37 @@ const initializeQuadPatchCompute = Fn ( ({geometry, uDeg, vDeg}) => {
 
 const vPassCompute = Fn ( ({geometry, uDeg, vDeg, currComputedLevel}) => {
     const maxLevel = int(6);
+    const numQuadPerDim = int(shiftLeft(1, currComputedLevel));
 
-    const numQuadPerDim = int(shiftLeft(int(1), int(currComputedLevel)));
+    // ranges from 1 to ((numQuadPerDim * uDeg)+1) (so really, 0 to (numQuadPerDim * uDeg))
     const gridX = int(div(instanceIndex, numQuadPerDim));
+    // ranges from 1 to numQuadPerDim (so really, 0 to numQuadPerDim-1)
     const gridY = mod(int(instanceIndex), numQuadPerDim);
 
 
     const stride = shiftLeft(1, sub(maxLevel, int(currComputedLevel)));
     const halfstride = shiftRight(stride, int(1));
 
+    // how many indices you have to move over before moving "right" 1 in the U direction
     const bufferSize = add(mul(int(vDeg), shiftLeft(1, maxLevel)), 1);
-    const flatternInstanceIndex = (i, j) => (add(mul(i, bufferSize), j));
+    const flattenInstanceIndex = (i, j) => (add(mul(i, bufferSize), j));
 
-    const x = int(mul(gridX, mul(stride, uDeg)));
+    const x = int(mul(gridX, stride));
     const y = int(mul(gridY, mul(stride, vDeg)));
 
-    const positionStorageAttribute = storage(geometry.attributes.position, 'vec3', geometry.attributes.position.count);
+    const positionStorageAttribute = geometry;
 
-    //let xtemp, ytemp;
+    Loop( { start: 0, end: int(vDeg), type: 'int', name: 'i', condition: '<' }, ( { i } ) => {
 
-    // part 1: edges
-    const limit = int(0);
+        Loop( { start: i, end: int(vDeg), type: 'int', name: 'j', condition: '<' }, ( { j } ) => {
 
-    If( gridX.equal(sub(numQuadPerDim, 1)), () => {
-        limit.assign(int(uDeg));
-    });
+            const ytemp = add(y, add(mul(halfstride, i), mul(sub(j, i), stride)));
 
-    Loop( { start: 0, end: int(limit), type: 'int', name: 'iteration', condition: '<=', update: int(uDeg) }, ( { iteration } ) => {
+            const p1  = flattenInstanceIndex(x, ytemp);
+            const mid = flattenInstanceIndex(x, add(ytemp, halfstride));
+            const p2  = flattenInstanceIndex(x, add(ytemp, stride));
 
-        Loop( { start: 0, end: int(vDeg), type: 'int', name: 'i', condition: '<' }, ( { i } ) => {
-
-            Loop( { start: i, end: int(vDeg), type: 'int', name: 'j', condition: '<' }, ( { j } ) => {
-
-                const xtemp = add(x, mul(stride, iteration));
-                const ytemp = add(y, add(mul(halfstride, i), mul(sub(j, i), stride)));
-
-                const p1  = int(flatternInstanceIndex(xtemp, ytemp));
-                const mid = int(flatternInstanceIndex(xtemp, add(ytemp, halfstride)));
-                const p2  = int(flatternInstanceIndex(xtemp, add(ytemp, stride)));
-
-                positionStorageAttribute.element(mid).assign(div(add(positionStorageAttribute.element(p1), positionStorageAttribute.element(p2)), float(2)));
-
-            } );
-
-        } );
-    } );
-
-
-
-    // part 2: midsection
-    Loop( { start: 1, end: int(uDeg), type: 'int', name: 'iteration', condition: '<' }, ( { iteration } ) => {
-
-        Loop( { start: 0, end: int(vDeg), type: 'int', name: 'i', condition: '<' }, ( { i } ) => {
-
-            Loop( { start: i, end: int(vDeg), type: 'int', name: 'j', condition: '<' }, ( { j } ) => {
-
-                const xtemp = add(x, mul(stride, iteration));
-                const ytemp = add(y, add(mul(halfstride, i), mul(sub(j, i), stride)));
-
-                const p1  = flatternInstanceIndex(xtemp, ytemp);
-                const mid = flatternInstanceIndex(xtemp, add(ytemp, halfstride));
-                const p2  = flatternInstanceIndex(xtemp, add(ytemp, stride));
-
-                positionStorageAttribute.element(mid).assign(div(add(positionStorageAttribute.element(p1), positionStorageAttribute.element(p2)), 2));
-
-            } );
+            positionStorageAttribute.element(mid).assign(div(add(positionStorageAttribute.element(p1), positionStorageAttribute.element(p2)), 2));
 
         } );
 
@@ -103,156 +69,39 @@ const vPassCompute = Fn ( ({geometry, uDeg, vDeg, currComputedLevel}) => {
 
 });
 
-const uPassCompute = Fn ( ({geometry, uDeg, vDeg, currComputedLevel}) => {
+const uPassCompute = Fn ( ({positionStorage, uDeg, vDeg, currComputedLevel}) => {
     const maxLevel = int(6);
-
     const numQuadPerDim = int(shiftLeft(int(1), currComputedLevel));
-    const gridX = int(div(instanceIndex, numQuadPerDim));
-    const gridY = mod(int(instanceIndex), numQuadPerDim);
 
+    // ranges from 0 to (numQuadPerDim-1)
+    const gridX = mod(int(instanceIndex), numQuadPerDim);
+    // ranges from 0 to (numQuadPerDim * vDeg * 2)
+    const gridY = int(div(instanceIndex, numQuadPerDim));
 
     const stride = shiftLeft(1, sub(maxLevel, currComputedLevel));
     const halfstride = shiftRight(stride, int(1));
 
-    const bufferSize = add(mul(vDeg, shiftLeft(1, maxLevel)), 1);
-    const flatternInstanceIndex = (i, j) => (add(mul(i, bufferSize), j));
+    const bufferSize = add(mul(int(vDeg), shiftLeft(1, maxLevel)), 1);
+    const flattenInstanceIndex = (i, j) => (add(mul(i, bufferSize), j));
 
     const x = mul(gridX, mul(stride, uDeg));
-    const y = mul(gridY, mul(stride, vDeg));
+    const y = mul(gridY, halfstride);
 
-    const positionStorageAttribute = storage(geometry.attributes.position, 'vec3', geometry.attributes.position.count);
+    Loop( { start: 0, end: int(uDeg), type: 'int', name: 'i', condition: '<' }, ( { i } ) => {
 
-    let xtemp, ytemp;
+        Loop( { start: i, end: int(uDeg), type: 'int', name: 'j', condition: '<' }, ( { j } ) => {
 
-    const limit = int(0);
+            const xtemp = add(x, add(mul(halfstride, i), mul(stride, sub(j, i))));
 
-    // part 1: edges
-    If( gridY.equal(sub(numQuadPerDim, 1)), () => {
-        limit.assign(int(mul(vDeg, 2)));
-    });
+            const p1  = flattenInstanceIndex(xtemp, y);
+            const mid = flattenInstanceIndex(add(xtemp, halfstride), y);
+            const p2  = flattenInstanceIndex(add(xtemp, stride), y);
 
-    Loop( { start: 0, end: int(limit), type: 'int', name: 'iteration', condition: '<=', update: int(mul(2, vDeg)) }, ( { iteration } ) => {
-
-        Loop( { start: 0, end: int(uDeg), type: 'int', name: 'i', condition: '<' }, ( { i } ) => {
-
-            Loop( { start: i, end: int(uDeg), type: 'int', name: 'j', condition: '<' }, ( { j } ) => {
-
-                ytemp = add(y, mul(halfstride, iteration));
-                xtemp = add(x, add(mul(halfstride, i), mul(stride, sub(j, i))));
-
-                const p1  = flatternInstanceIndex(xtemp, ytemp);
-                const mid = flatternInstanceIndex(add(xtemp, halfstride), ytemp);
-                const p2  = flatternInstanceIndex(add(xtemp, stride), ytemp);
-
-                positionStorageAttribute.element(mid).assign(div(add(positionStorageAttribute.element(p1), positionStorageAttribute.element(p2)), 2));
-
-            } );
+            positionStorage.element(mid).assign(div(add(positionStorage.element(p1), positionStorage.element(p2)), 2));
 
         } );
 
     } );
-
-    // part 2: midsection
-
-    Loop( { start: 1, end: mul(vDeg, 2), type: 'int', name: 'iteration', condition: '<' }, ( { iteration } ) => {
-
-        Loop( { start: 0, end: uDeg, type: 'int', name: 'i', condition: '<' }, ( { i } ) => {
-
-            Loop( { start: i, end: uDeg, type: 'int', name: 'j', condition: '<' }, ( { j } ) => {
-
-                ytemp = add(y, mul(halfstride, iteration));
-                xtemp = add(x, add(mul(halfstride, i), mul(stride, sub(j, i))));
-
-                const p1  = flatternInstanceIndex(xtemp, ytemp);
-                const mid = flatternInstanceIndex(add(xtemp, halfstride), ytemp);
-                const p2  = flatternInstanceIndex(add(xtemp, stride), ytemp);
-
-                positionStorageAttribute.element(mid).assign(div(add(positionStorageAttribute.element(p1), positionStorageAttribute.element(p2)), 2));
-
-            } );
-
-        } );
-
-    } );
-});
-
-const subDivideQuadPatchCompute = Fn ( ({geometry, uDeg, vDeg, currComputedLevel}) => { // currently 2^(currComputedLevel) x 2^(currComputedLevel) quads
-    const numQuadPerDim = uint(shiftLeft(1, currComputedLevel));
-    const gridX = div(instanceIndex, numQuadPerDim);
-    const gridY = mod(instanceIndex, numQuadPerDim);
-
-    const stride = shiftLeft(1, sub(6, currComputedLevel)); // 6 is the max resolution, so stride is 2^(6 - currComputedLevel)
-    const halfStride = shiftRight(stride, 1);
-
-    const bufferSize = add(mul(vDeg, 64), 1);
-    const flatternInstanceIndex = (i, j) => (add(mul(i, bufferSize), j));
-
-    const x = mul(gridX, mul(stride, uDeg));
-    const y = mul(gridY, mul(stride, vDeg));
-
-    const positionStorageAttribute = storage(geometry.attributes.position, 'vec3', geometry.attributes.position.count);
-
-    let xtemp, ytemp;
-
-    //const limit = uDeg;
-
-    let limit;
-
-    // part 1: edges
-    //If( equals(gridX, sub(numQuadPerDim, 1)), () => {
-    If( gridX.equal(sub(numQuadPerDim, 1)), () => {
-        limit = add(uDeg, 0);
-    }).Else( () => {
-        limit = add(0, 0);
-    });
-
-    // run decasteljau's across the v-direction, uDeg+1 times
-    Loop( { start: 0, end: uDeg, type: 'int', name: 'iteration', condition: '<=' }, ( { iteration } ) => {
-        //Loop( { start: 0, end: limit, type: 'int', name: 'iteration', condition: '<=' }, ( { iteration } ) => {
-
-        Loop( { start: 0, end: vDeg, type: 'int', name: 'i', condition: '<' }, ( { i } ) => {
-
-            Loop( { start: i, end: vDeg, type: 'int', name: 'j', condition: '<' }, ( { j } ) => {
-
-                // TEMP TEMP TEMP HORRIBLE
-                //xtemp = add(add(x, mul(stride, iteration)), mul(limit, 0));
-                xtemp = add(x, mul(iteration, stride));
-                ytemp = add(y, add(mul(i, halfStride), mul(sub(j, i), stride)));
-
-                const p1 = flatternInstanceIndex(xtemp, ytemp);
-                const mid = flatternInstanceIndex(xtemp, add(ytemp, halfStride));
-                const p2 = flatternInstanceIndex(xtemp, add(ytemp, stride));
-
-                positionStorageAttribute.element(mid).assign(div(add(positionStorageAttribute.element(p1), positionStorageAttribute.element(p2)), 2));
-
-            } );
-
-        } );
-
-    } );
-
-    // run decasteljau's across the u-direction, (vDeg*2)+1 times
-    Loop( { start: 0, end: mul(vDeg, 2), type: 'int', name: 'iteration', condition: '<=' }, ( { iteration } ) => {
-
-        Loop( { start: 0, end: uDeg, type: 'int', name: 'i', condition: '<' }, ( { i } ) => {
-
-            Loop( { start: i, end: uDeg, type: 'int', name: 'j', condition: '<' }, ( { j } ) => {
-
-                ytemp = add(y, mul(halfStride, iteration));
-                xtemp = add(x, add(mul(halfStride, i), mul(stride, sub(j, i))));
-
-                const p1  = flatternInstanceIndex(xtemp, ytemp);
-                const mid = flatternInstanceIndex(add(xtemp, halfStride), ytemp);
-                const p2 = flatternInstanceIndex(add(xtemp, stride), ytemp);
-
-                positionStorageAttribute.element(mid).assign(div(add(positionStorageAttribute.element(p1), positionStorageAttribute.element(p2)), 2));
-
-            } );
-
-        } );
-
-    } );
-
 });
 
 const indexBuffers = {};
@@ -261,6 +110,7 @@ function generateFixedBufferGridIndices(n, uDeg, vDeg) {
     if (key in indexBuffers) {
         return indexBuffers[key];
     }
+    console.log(`cache miss: ${key}`)
 
     const quadsPerDim = 1 << n; // 2^n
     const stride = 1 << (6 - n);
@@ -307,81 +157,95 @@ export class BvPatch extends THREE.Mesh {
         this.vDeg = vDeg;
         this.controlPts = controlPts;
         this.currComputedLevel = 0; // The number of subdivision in each dimension
-        this.currLevel = initialLevel;;
+        this.currLevel = initialLevel;
 
         this.cpBuffer = new THREE.Float32BufferAttribute(controlPts, 4, false);
         this.geometry.setAttribute( 'cpAttribute', this.cpBuffer );
-        //console.log(this.geometry.getAttribute('cpAttribute').count);
 
         const positionStorageBufferAttribute = new THREE.StorageBufferAttribute( (((this.uDeg * 64) + 1) * ((this.vDeg * 64) + 1)), 3 );
         this.geometry.setAttribute( 'position', positionStorageBufferAttribute );
-        //console.log(this.geometry.attributes.position.count, "vertices");
+        this.positionStorage = storage(
+            this.geometry.getAttribute('position'), 'vec3', this.geometry.getAttribute('position').count
+        );
 
         this.currVersion = 0;
         this.material = new THREE.MeshBasicMaterial({
             color: 0xff0000,
             wireframe: true
         });
-        this.#initializeQuadPatch().then(() => {this.setLevel(initialLevel);});
-
-
+        // this.#initializeQuadPatch().then(() => {this.setLevel(initialLevel);});
+        this.#initializeQuadPatch();
     }
 
     async #initializeQuadPatch() {
         // Use compute shader to set values of positionBuffer and normal Buffer. Also create buffers for curvatures.
 
-        const compute = initializeQuadPatchCompute({geometry: this.geometry, uDeg: this.uDeg, vDeg: this.vDeg}).compute(1)
+        const compute = initializeQuadPatchCompute({geometry: this.geometry, uDeg: this.uDeg, vDeg: this.vDeg}).compute(1);
 
         this.geometry.setIndex(generateFixedBufferGridIndices(0, this.uDeg, this.vDeg));
         return this.renderer.computeAsync( compute );
 
     }
 
-    async #vPass() {
-        const numCompute = (1 << this.currComputedLevel) * (1 << this.currComputedLevel);
-        const compute = vPassCompute({geometry: this.geometry, uDeg: this.uDeg, vDeg: this.vDeg, currComputedLevel: this.currComputedLevel}).compute(numCompute);
-
-        //console.log( this.renderer._pipelines.nodes.getForCompute( compute ).computeShader ); //print compiled shader
-
-        return this.renderer.computeAsync( compute );
-    }
-
-    async #uPass() {
-        const numCompute = (1 << this.currComputedLevel) * (1 << this.currComputedLevel);
-        const compute = uPassCompute({geometry: this.geometry, uDeg: this.uDeg, vDeg: this.vDeg, currComputedLevel: this.currComputedLevel}).compute(numCompute);
-
-        return this.renderer.computeAsync( compute );
-    }
-
-    async #subDivideQuadPatch() {
-        if(this.currComputedLevel >= 6) {
-            console.warn("Maximum subdivision level reached. Cannot subdivide further.");
-            return;
+    // these can't be shared across BvPatch instances (like indices can) because there's no way to uniform()
+    // storage access, but this still means each mesh only creates 2 shader modules
+    #passesFor(level) {
+        const nqpd = (1 << level); // "number of quads per dimension"
+        return {
+            v: vPassCompute({
+                geometry: this.positionStorage, uDeg: uniform(this.uDeg), vDeg: uniform(this.vDeg),
+                currComputedLevel: uniform(level)
+            }).compute(((nqpd * this.uDeg)+1)*nqpd),
+            u: uPassCompute({
+                positionStorage: this.positionStorage, uDeg: uniform(this.uDeg), vDeg: uniform(this.vDeg),
+                currComputedLevel: uniform(level)
+            }).compute(((nqpd*this.vDeg*2)+1)*nqpd)
         }
-        const compute = subDivideQuadPatchCompute({geometry: this.geometry, uDeg: this.uDeg, vDeg: this.vDeg, currComputedLevel: this.currComputedLevel}).compute((1 << this.currComputedLevel) * (1 << this.currComputedLevel));
-        //console.log( this.renderer._pipelines.nodes.getForCompute( compute ).computeShader ); //print compiled shader
-
-        this.currComputedLevel += 1;
-        //const indices = generateFixedBufferGridIndices(this.currComputedLevel, 1, 1);
-        //this.geometry.setIndex(indices);
-        return this.renderer.computeAsync( compute );
     }
 
-    async setLevel(level) {
+    setLevel(level) {
         //console.log(level, this.currComputedLevel, this.geometry.index.version, this.currVersion);
-        if(this.currComputedLevel >= level){
+        if (this.currComputedLevel >= level){
             this.currLevel = level;
+        } else {
+            const passes = [];
+            for (let i = this.currComputedLevel; i < level; i++) {
+                // 1. pass across the v direction
+                // 2. pass across the u direction
+                // (needs to happen in this order, uPass dependent on values calculated in the vPass)
+                let p = this.#passesFor(i);
+                passes.push(p.v);
+                passes.push(p.u);
+                this.currComputedLevel+=1;
+            }
+            this.renderer.compute(passes)
+            this.currLevel = level;
+            this.currComputedLevel = level;
+        }
+        const indices = generateFixedBufferGridIndices(level, this.uDeg, this.vDeg);
+        this.geometry.setIndex(indices);
+        this.currVersion += 1;
+        this.geometry.index.version = this.currVersion;
+    }
 
-        }else{
-            for( let i = this.currComputedLevel; i < level; i++) {
-                //await this.#subDivideQuadPatch();
 
-                //// 1. pass across the v direction
-                await this.#vPass();
-                //// 2. pass across the u direction
-                await this.#uPass();
+    // returns an array of compute nodes that, when computed, will subdivide this mesh.
+    // useful because these arrays can be aggregated from many meshes, and then all be
+    // computed at once, with a single `compute` call.
+    getLevelPasses(level) {
+        const passes = [];
 
-                this.currComputedLevel += 1;
+        if (this.currComputedLevel >= level) {
+            this.currLevel = level;
+        } else {
+            for (let i = this.currComputedLevel; i < level; i++) {
+                // 1. pass across the v direction
+                // 2. pass across the u direction
+                // (needs to happen in this order, uPass dependent on values calculated in the vPass)
+                let p = this.#passesFor(i);
+                passes.push(p.v);
+                passes.push(p.u);
+                this.currComputedLevel+=1;
             }
             this.currLevel = level;
             this.currComputedLevel = level;
@@ -390,5 +254,6 @@ export class BvPatch extends THREE.Mesh {
         this.geometry.setIndex(indices);
         this.currVersion += 1;
         this.geometry.index.version = this.currVersion;
+        return passes
     }
 }

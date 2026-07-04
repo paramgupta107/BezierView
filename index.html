@@ -27,12 +27,13 @@
         </script>
         <!-- <script type="module" src = "stateManager.js"></script> -->
         <script type="module">
-            import * as THREE from 'three';
+            import * as THREE from 'three/webgpu';
             import {globalState, setupGui, loadFile, gui} from './stateManager.js';
             import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
             import { BvPatch } from './BvPatch.js';
+            import {BvLoader} from './BvLoader.js';
             let camera, scene, renderer, light, controls, time = 0;
-            let bvPatch;
+            let bvFile; // holds the full file that was loaded, not just one patch
             const timer = new THREE.Timer();
             function init(){
                 // File loader
@@ -76,130 +77,79 @@
 
 			    window.addEventListener( 'resize', onWindowResize );
 
-                //Test
-                gui.add({'level': 1}, 'level', 0, 6, 1).name('Patch Level').onChange((value) => {
-                    bvPatch.setLevel(value);
-                    // bvPatch.needsUpdate = true;
+                // File loader
+                const bvLoader = new BvLoader(THREE.DefaultLoadingManager, renderer);
+                let chooseModelHandle = gui.children[0].children[0];
+
+                document.getElementById('fileInput').addEventListener('change', (event) => {
+                    loadBVFile(event);
                 });
-                const controlPoints = [
-                    -1, -1, 0, 1,
-                    -1, 1, 0, 1,
-                    1, -1, 0, 1,
-                    1, 1, 0, 1,
-                ]
-                const controlPointsOffset = [
-                    -1, -1, 2, 1,
-                    -1, 1, 2, 1,
-                    1, -1, 2, 1,
-                    1, 1, 2, 1,
-                ]
-                const test7 = [
-                    -1, -1, 0, 1,
-                    -1,  1, 0, 1,
-                     1, -1, -1, 1,
-                     1,  1, 1, 1,
-                ]
-                const deg2x3 = [
-                    -1.5,  1.0,  0.0, 1,
-                    -0.5,  1.0,  0.0, 1,
-                     0.5,  1.0,  0.0, 1,
-                     1.5,  1.0,  0.0, 1,
-                    -1.5,  0.0,  0.0, 1,
-                    -0.5,  0.0,  0.5, 1,
-                     0.5,  0.0,  0.5, 1,
-                     1.5,  0.0,  0.0, 1,
-                    -1.5, -1.0,  0.0, 1,
-                    -0.5, -1.0,  0.0, 1,
-                     0.5, -1.0,  0.0, 1,
-                     1.5, -1.0,  0.0, 1,
-                ]
-                const deg1x2 = [
-                    -1, -1, 0, 1,
-                     0, -1, 0, 1,
-                     1, -1, 0, 1,
-                    -1,  1, 0, 1,
-                     0,  1, 0, 1,
-                     1,  1, 0, 1,
-                ]
-                const bi3 = [
-                    -1.5,  1.5, 0.0, 1,
-                    -0.5,  1.5, 0.0, 1,
-                     0.5,  1.5, 0.0, 1,
-                     1.5,  1.5, 0.0, 1,
-                    -1.5,  0.5, 0.0, 1,
-                    -0.5,  0.5, 0.5, 1,
-                     0.5,  0.5, 0.5, 1,
-                     1.5,  0.5, 0.0, 1,
-                    -1.5, -0.5, 0.0, 1,
-                    -0.5, -0.5, 0.5, 1,
-                     0.5, -0.5, 0.5, 1,
-                     1.5, -0.5, 0.0, 1,
-                    -1.5, -1.5, 0.0, 1,
-                    -0.5, -1.5, 0.0, 1,
-                     0.5, -1.5, 0.0, 1,
-                     1.5, -1.5, 0.0, 1,
-                ]
-                const rat1 = [
-                    -2, -2,  2, 1,
-                    -3,  0,  3, 1,
-                    -2,  2,  2, 1,
-                     0, -3,  3, 1,
-                     0,  0, 24, 2,
-                     0,  3,  3, 1,
-                     2, -2,  2, 1,
-                     3,  0,  3, 1,
-                     2,  2,  2, 1,
-                ]
-                const test5 = [
-                    0,  0, 0, 1,
-                    0, 10, 1, 1,
-                    0,  0, 2, 1,
 
-                    1,  0, 0, 1,
-                    1, 10, 1, 1,
-                    1,  0, 2, 1,
+                function loadBVFile(event) {
+                    const file = event.target.files[0];
 
-                    2,  0, 0, 1,
-                    2, 10, 1, 1,
-                    2,  0, 2, 1,
-                ]
-                const test6 = [
-                    0,  0, 0, 1,
-                    0,  0, 1, 1,
-                    0,  0, 2, 1,
+                    if (!file) {
+                        console.log("Error loading file");
+                        return;
+                    }
 
-                    1, 10, 0, 1,
-                    1, 10, 1, 1,
-                    1, 10, 2, 1,
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        console.log("file loaded");
 
-                    2,  0, 0, 1,
-                    2,  0, 1, 1,
-                    2,  0, 2, 1,
-                ]
-                const test8 =  [
-                    0,  0, 0, 1,
-                    0,  0, 1, 1,
-                    0,  0, 2, 1,
+                        // remove the old model (if there is one) and clean up
+                        if (bvFile) {
+                            scene.remove(bvFile);
+                            for (const group of bvFile.children) {
+                                for (const patch of group.children) {
+                                    patch.geometry.dispose()
+                                    patch.material.dispose()
+                                }
+                            }
+                        }
 
-                    1,  0, 0, 1,
-                    1,  0, 1, 1,
-                    1,  0, 2, 1,
+                        // just the bv file's text
+                        const text = event.target.result;
+                        bvFile = bvLoader.parse(text);
+                        scene.add(bvFile);
 
-                    2,  0, 0, 1,
-                    2, 10, 1, 1,
-                    2,  0, 2, 1,
-                ]
-                //bvPatch = new BvPatch(renderer, controlPoints, "quad", 1, 1, 2 );
-                //bvPatch = new BvPatch(renderer, controlPointsOffset, "quad", 1, 1, 1 );
-                //bvPatch = new BvPatch(renderer, deg2x3, "quad", 2, 3, 2 );
-                //bvPatch = new BvPatch(renderer, deg1x2, "quad", 1, 2, 2 );
-                //bvPatch = new BvPatch(renderer, bi3, "quad", 3, 3, 2 );
-                bvPatch = new BvPatch(renderer, rat1, "quad", 2, 2, 1 );
-                //bvPatch = new BvPatch(renderer, test5, "quad", 2, 2, 1);
-                //bvPatch = new BvPatch(renderer, test6, "quad", 2, 2, 1);
-                //bvPatch = new BvPatch(renderer, test8, "quad", 2, 2, 1);
+                        // TODO: update the GUI now that a new model has been loaded (groups section, etc)
+                    }
+                    reader.readAsText(file);
 
-                scene.add( bvPatch );
+
+                }
+
+                renderer.onDeviceLost = (deviceLostInfo) => {
+                    console.log(`WebGPU Device Lost: ${deviceLostInfo.message}`);
+                };
+
+                //Test
+                let init_level = 2
+                gui.add({'level': init_level}, 'level', 0, 6, 1).name('Patch Level').onChange((value) => {
+                    // console.time('change tessellation level')
+                    console.log(`setting level to: ${value}`)
+
+                    const all_passes = []
+                    for (const group of bvFile.children) {
+                        for (const patch of group.children) {
+                            all_passes.push(...patch.getLevelPasses(value))
+                            // patch.setLevelAwait(value);
+                        }
+                    }
+                    if (all_passes.length !== 0)
+                        renderer.compute(all_passes);
+                    // console.timeEnd('change tessellation level');
+                });
+                /*
+                gui.add({'level': 1}, 'level', 0, 6, 1).name('Patch Level').onChange(async (value) => {
+                    console.time('change patch level');
+                    bvFile.setLevel(value).then(() => console.timeEnd('change patch level'));
+
+                    // bvFile.needsUpdate = true;
+                });
+                 */
+
             }
 
             function onWindowResize() {
@@ -213,11 +163,13 @@
             }
 
             function render() {
-
+                // console.time('render');
+                timer.update()
                 const delta = timer.getDelta();
                 time += delta;
                 // render
                 renderer.render( scene, camera );
+                // console.timeEnd('render');
             }
 
             init();
